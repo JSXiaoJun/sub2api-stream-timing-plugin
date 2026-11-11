@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "inventory.openai.stream-timing",
+  "name": "流式首事件计时",
+  "version": "0.1.4-am1.1",
+  "description": "独立 Responses 流计时插件：等待指定毫秒后发送一次空提示，或增加首事件延迟。默认关闭。",
+  "author": "Inventory Manager",
+  "requires": {
+    "sub2api": "=0.2.13-eu-cache.4-key.1",
+    "recommended_sub2api_version": "0.2.13-eu-cache.4-key.1",
+    "tested_sub2api_versions": [
+      "0.2.13-eu-cache.4-key.1"
+    ],
+    "plugin_protocol": 1,
+    "transport_api": 1,
+    "ui_bridge": 1
+  },
+  "capabilities": [
+    {
+      "id": "openai.oauth.outbound_transport.v1",
+      "platform": "openai",
+      "account_type": "oauth"
+    },
+    {
+      "id": "openai.apikey.outbound_transport.v1",
+      "platform": "openai",
+      "account_type": "apikey"
+    }
+  ],
+  "runtimes": {},
+  "ui": {
+    "entrypoint": "ui/index.html"
+  },
+  "files": {}
+}

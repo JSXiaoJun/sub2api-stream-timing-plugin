@@ -1,0 +1,14 @@
+# 签名私钥：绝不入库（保存在包目录之外）
+.keys/
+*.private
+
+# 构建产物与签名包
+build/
+dist/
+*.s2plugin
+*.exe
+*.test
+
+# 本地产物
+pkgroot/
+delivery/

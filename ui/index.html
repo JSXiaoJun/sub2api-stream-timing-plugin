@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>流式首事件计时</title><link rel="stylesheet" href="assets/styles.css"></head>
+<body><main><h1>流式首事件计时</h1><p>AM1 适配 · 0.1.4-am1.1 · Sub2API 0.2.13-eu-cache.4-key.1</p>
+<aside>用于「上游 Sub → 下游 Sub」的 Responses 流。空提示可提前结束下游的首事件计时；实际文字仍按上游速度到达。下游需使用 semantic 计时，visible 计时仍等待真实内容。</aside>
+<form id="config"><fieldset id="fields" disabled><div class="grid">
+<label>工作模式<select name="mode"><option value="off">关闭：原样传递</option><option value="hint">超时空提示：等待后再提前回应</option><option value="delay">增加延迟：推迟首个输出</option></select></label>
+<label id="hint-wait-field" hidden>等待方式<select name="hint_wait_mode"><option value="fixed">固定等待时间</option><option value="random">范围内随机等待</option></select><small>随机方式在每次请求开始时抽取一次，单位为毫秒。</small></label>
+<label id="hint-field" hidden>等待多少毫秒后发送空提示<input name="hint_after_ms" type="number" min="0" max="60000" required><small>1000 毫秒 = 1 秒。范围 1–60000；0 为旧版空内容项触发方式。</small></label>
+<label id="hint-min-field" hidden>随机等待下限（毫秒）<input name="hint_min_ms" type="number" min="1" max="60000" required><small>例如 1000 表示至少等待 1 秒。</small></label>
+<label id="hint-max-field" hidden>随机等待上限（毫秒）<input name="hint_max_ms" type="number" min="1" max="60000" required><small>例如 2000 表示抽取值最多 2 秒。上限须大于或等于下限。</small></label>
+<label id="delay-field" hidden>额外延迟多少毫秒<input name="delay_ms" type="number" min="0" max="30000" required><small>只在“增加延迟”模式生效。</small></label></div>
+<p id="mode-note" class="note" aria-live="polite"></p>
+<button type="button" id="preset">使用建议配置：等待 1 秒</button>
+<details id="retries" open><summary>提示后的 503／过载重试（兼容空错误码）</summary><div class="grid">
+<label>最多额外重试次数<input name="retry_max_attempts" type="number" min="0" max="3" required><small>建议 2（总计最多 3 次请求）；0 关闭重试。</small></label>
+<label>重试总等待预算（毫秒）<input name="retry_total_wait_ms" type="number" min="1" max="60000" required><small>建议 10000。从第一次可重试失败开始，覆盖退避和后续响应等待；真实事件透传后不再截断长回答。</small></label>
+<label>首次退避时间（毫秒）<input name="retry_backoff_ms" type="number" min="1" max="10000" required><small>建议 500；后续翻倍并附加少量随机等待。遵守 Retry-After，超预算就返回原失败。</small></label>
+<label>可重放请求体上限（字节）<input name="retry_body_max_bytes" type="number" min="65536" max="8388608" required><small>建议 2097152（2 MiB）。超大或未知长度请求直接保留原路径，不抢先发送提示。</small></label>
+<label>最多同时保留重试缓冲的请求数<input name="retry_max_concurrent" type="number" min="1" max="128" required><small>建议 32；全局另有 64 MiB 总缓冲上限。满额时跳过提前提示，保留宿主原路径。与提示处理名额分开计数。</small></label>
+</div></details>
+<details id="resources"><summary>资源与连接配置</summary><div class="grid">
+<label>事件缓冲上限（字节）<input name="max_event_bytes" type="number" min="4096" max="1048576" required></label>
+<label>最大同时等待／处理数<input name="max_concurrent_transforms" type="number" min="1" max="4096" required><small>提示发送成功或有效输出到达后即释放名额，后续回答继续传输。等待阶段满额时原样传递，并累计“并发跳过”。</small></label>
+<label>最多缓存连接池数<input name="max_proxy_pools" type="number" min="1" max="512" required></label>
+<label>每池最多空闲连接<input name="idle_connections_per_pool" type="number" min="1" max="64" required></label>
+<label>空闲连接超时（秒）<input name="idle_timeout_seconds" type="number" min="1" max="600" required></label>
+<label>连接超时（秒）<input name="dial_timeout_seconds" type="number" min="1" max="120" required></label>
+<label>TLS 握手超时（秒）<input name="tls_handshake_timeout_seconds" type="number" min="1" max="60" required></label>
+<label>响应头超时（秒，0 关闭）<input name="response_header_timeout_seconds" type="number" min="0" max="600" required></label>
+<label class="check"><input name="enable_http2" type="checkbox">允许 HTTP/2 协商</label></div></details>
+<p>计时从发起上游请求开始，包含连接与上传。响应头、心跳、空的准备事件仍算等待；首个有效模型输出在期限内到达，就保持原事件传输。</p>
+<p>释放的是提示／首次处理名额；HTTP 连接、正文转发与错误检测继续运行。随机范围限定插件等待阈值，使用记录还可能包含插件之前的处理耗时。</p>
+<p>空提示发出后，宿主输出前自动换号的机会结束。本插件可在首次上游事件透传之前，对明确 503／过载使用同一账号和请求体作有限重试；不是换号。0.1.4 同时识别错误码为空、错误文字为 “Our servers are currently overloaded. Please try again later.” 的失败。响应标识、心跳、正文或工具事件一旦透传，就不再重放。次数／时间耗尽后仍返回真实失败，不伪造成功。支持 OpenAI OAuth HTTP Responses 与 API Key 流式 HTTP Responses；API Key 非流式、原生 Chat Completions、其他端点及原生 WebSocket 保持宿主路径。同一传输能力的过载冷却插件需先停用。</p>
+<div class="actions"><button type="button" id="save">保存并应用</button><button type="button" id="reload">重新读取</button><button type="button" id="test">检查已保存配置</button><button type="button" id="status">刷新状态</button></div>
+</fieldset></form><p id="message" role="status">正在读取配置…</p>
+<section aria-label="运行状态"><h2>运行状态</h2><p id="status-note">正在读取…</p><div id="summary" class="metrics" aria-live="polite"></div><p class="muted">计数为本次插件进程启动以来的累计值；定时提示发出时即计数。状态查询只读取本地。</p></section>
+<details id="raw-status"><summary>查看完整状态 JSON</summary><pre id="stats">尚未读取状态</pre></details>
+</main><script src="assets/bridge-v1.js"></script><script src="assets/app.js"></script></body></html>
